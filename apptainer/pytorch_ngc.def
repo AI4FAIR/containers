@@ -17,55 +17,87 @@ Bootstrap: docker
 From: nvcr.io/nvidia/pytorch:23.12-py3  # PyTorch 2.1.2, CUDA 12.2
 
 %post
-    # Update and install system dependencies
-    apt-get update && apt-get install -y \
+    # Handle OS dependencies
+    apt-get update && apt-get upgrade -y
+    apt-get install -y --no-install-recommends \
+		ca-certificates \
         git \
         wget \
-        && rm -rf /var/lib/apt/lists/*
+        build-essential \
+        curl \
+    && apt-get clean \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-    # Install Python dependencies
+    # Handle Python dependencies
     pip install --no-cache-dir \
-        pytorch-lightning \
-        scikit-learn \
-        pandas \
-        numpy \
-        matplotlib \
-        seaborn \
-        jupyterlab
-        
+        pytorch-lightning==2.1.* \
+        scikit-learn==1.3.* \
+        pandas==2.1.* \
+        numpy==1.24.* \
+        matplotlib==3.8.* \
+        seaborn==0.13.* \
+        jupyterlab==4.0.*
 
 %environment
-    # Set environment variables
+    # Environment variables
     export PATH=/usr/local/bin:$PATH
     export PYTHONPATH=/workspace:$PYTHONPATH
     export SHELL=/bin/bash
     export LC_ALL=C.UTF-8
     export LANG=C.UTF-8
+    
+    # Threading controls
+    export MKL_NUM_THREADS=1
+    export NUMEXPR_NUM_THREADS=1
+    export OMP_NUM_THREADS=1
+    export OPENBLAS_NUM_THREADS=1
 
 %runscript
     if [ "$1" = "jupyter" ]; then
-        # Auto-bind $PWD if it is outside $HOME
+        # Handle Ctrl+C gracefully
+        trap 'echo "Caught SIGINT, shutting down Jupyter gracefully..."; kill -TERM $!; exit 1' INT
+        
+        shift  # Remove 'jupyter' from args
+        
         if [[ "$PWD" != "$HOME"* ]]; then
-            echo "Binding current directory: $PWD"
-            apptainer exec --nv --bind "$PWD:$PWD" jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --notebook-dir="$PWD"
+            echo "Starting Jupyter Lab in: $PWD"
         else
-            echo "Running Jupyter in $HOME"
-            jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --notebook-dir="$HOME"
+            echo "Starting Jupyter Lab in: $HOME"
         fi
-    else
+
+        jupyter-lab --ip=0.0.0.0 --port=${JUPYTER_PORT:-8888} --no-browser --notebook-dir="$PWD" "$@"
+        
+    elif [ -n "$1" ]; then
         echo "Running Python script: $@"
         python "$@"
+    else
+        echo "Error: Please provide a Python script or 'jupyter' as an argument"
+        exit 1
     fi
 
+
+%startscript
+    # For running container as a service
+    jupyter-lab --ip=0.0.0.0 --port=${JUPYTER_PORT:-8888} --no-browser --notebook-dir="/workspace"
+
 %test
-    # Check installed packages and GPU access
-    python3 -c "import torch; print('PyTorch Version:', torch.__version__); print('CUDA Available:', torch.cuda.is_available())"
+    echo "Testing Python packages..."
+    python3 -c "import torch; print('PyTorch Version:', torch.__version__); assert torch.cuda.is_available(), 'CUDA not available'"
     python3 -c "import pytorch_lightning as pl; print('PyTorch Lightning Version:', pl.__version__)"
     python3 -c "import matplotlib; print('Matplotlib Version:', matplotlib.__version__)"
     python3 -c "import pandas; print('Pandas Version:', pandas.__version__)"
     python3 -c "import numpy; print('NumPy Version:', numpy.__version__)"
     python3 -c "import seaborn; print('Seaborn Version:', seaborn.__version__)"
     python3 -c "import sklearn; print('Scikit-learn Version:', sklearn.__version__)"
+    
+    echo "Testing GPU access..."
+    python3 -c "import torch; assert torch.cuda.device_count() > 0, 'No GPU devices found'; print('Found', torch.cuda.device_count(), 'GPU(s)')"
+    
+    echo "Testing Jupyter installation..."
+    jupyter-lab --version
+    
+    echo "All tests passed!"
 
 %labels
     Author Adeel Akram
@@ -76,26 +108,33 @@ From: nvcr.io/nvidia/pytorch:23.12-py3  # PyTorch 2.1.2, CUDA 12.2
 
 %help
     This container is built on the NVIDIA NGC PyTorch base image and provides the following features:
-    - PyTorch and PyTorch Lightning for deep learning.
-    - JupyterLab for interactive development.
-    - Data science libraries: matplotlib, pandas, numpy, seaborn, and scikit-learn.
-    - Automatically binds the current directory to /workspace if outside the home directory.
-    - Default behavior: Runs a Python script passed as an argument.
-    - Option to start Jupyter Lab by passing "lab" as the first argument.
-
+    - PyTorch and PyTorch Lightning for deep learning
+    - JupyterLab for interactive development
+    - Data science libraries: matplotlib, pandas, numpy, seaborn, and scikit-learn
+    - Automatically uses current directory as workspace
+    - Threading controls for better performance
+    
     Usage:
     # Build the container
     apptainer build pytorch.sif pytorch.def
-
+    
     # Run a Python script
     apptainer run --nv pytorch.sif script.py
-
-    # Start Jupyter Lab
+    
+    # Start Jupyter Lab (default port 8888)
     apptainer run --nv pytorch.sif jupyter
+    
+    # Start Jupyter Lab with custom port
+    JUPYTER_PORT=9999 apptainer run --nv pytorch.sif jupyter
+    
+    # Start Jupyter with additional args
+    apptainer run --nv pytorch.sif jupyter --NotebookApp.token='' --NotebookApp.password=''
+    
+    # Run as a service
+    apptainer instance start --nv pytorch.sif pytorch
     
     # Run interactive shell
     apptainer shell --nv pytorch.sif
     
-    # Test Container (run %test section)
-    apptainer run --nv pytorch.sif
-
+    # Test Container
+    apptainer test pytorch.sif
