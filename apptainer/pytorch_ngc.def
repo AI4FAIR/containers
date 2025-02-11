@@ -17,21 +17,30 @@ Bootstrap: docker
 From: nvcr.io/nvidia/pytorch:23.12-py3  # PyTorch 2.1.2, CUDA 12.2
 
 %post
-    # Install required packages
+    # Update and install system dependencies
     apt-get update && apt-get install -y \
-        python3-pip \
         git \
+        wget \
         && rm -rf /var/lib/apt/lists/*
 
     # Install Python dependencies
     pip install --no-cache-dir \
+        pytorch-lightning \
+        scikit-learn \
+        pandas \
+        numpy \
+        matplotlib \
+        seaborn \
         jupyterlab
         
 
 %environment
+    # Set environment variables
     export PATH=/usr/local/bin:$PATH
     export PYTHONPATH=/workspace:$PYTHONPATH
     export SHELL=/bin/bash
+    export LC_ALL=C.UTF-8
+    export LANG=C.UTF-8
 
 %runscript
     if [ "$1" = "jupyter" ]; then
@@ -41,7 +50,7 @@ From: nvcr.io/nvidia/pytorch:23.12-py3  # PyTorch 2.1.2, CUDA 12.2
             apptainer exec --nv --bind "$PWD:$PWD" jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --notebook-dir="$PWD"
         else
             echo "Running Jupyter in $HOME"
-            exec jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --notebook-dir="$HOME"
+            jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --notebook-dir="$HOME"
         fi
     else
         echo "Running Python script: $@"
@@ -51,17 +60,25 @@ From: nvcr.io/nvidia/pytorch:23.12-py3  # PyTorch 2.1.2, CUDA 12.2
 %test
     # Check installed packages and GPU access
     python3 -c "import torch; print('PyTorch Version:', torch.__version__); print('CUDA Available:', torch.cuda.is_available())"
-    python3 -c "import jupyterlab; print('JupyterLab Version:', jupyterlab.__version__)"
+    python3 -c "import pytorch_lightning as pl; print('PyTorch Lightning Version:', pl.__version__)"
+    python3 -c "import matplotlib; print('Matplotlib Version:', matplotlib.__version__)"
+    python3 -c "import pandas; print('Pandas Version:', pandas.__version__)"
+    python3 -c "import numpy; print('NumPy Version:', numpy.__version__)"
+    python3 -c "import seaborn; print('Seaborn Version:', seaborn.__version__)"
+    python3 -c "import sklearn; print('Scikit-learn Version:', sklearn.__version__)"
 
 %labels
     Author Adeel Akram
     Email adeel.chep@gmail.com
-    Description "Apptainer container with NVIDIA PyTorch NGC and Jupyter Lab"
+    Description "Apptainer container with NVIDIA PyTorch NGC, PyTorch Lightning, JupyterLab, and data science libraries"
     BuildDate 2025-02-11
     BaseImage nvcr.io/nvidia/pytorch:23.12-py3
 
 %help
     This container is built on the NVIDIA NGC PyTorch base image and provides the following features:
+    - PyTorch and PyTorch Lightning for deep learning.
+    - JupyterLab for interactive development.
+    - Data science libraries: matplotlib, pandas, numpy, seaborn, and scikit-learn.
     - Automatically binds the current directory to /workspace if outside the home directory.
     - Default behavior: Runs a Python script passed as an argument.
     - Option to start Jupyter Lab by passing "lab" as the first argument.
@@ -75,3 +92,10 @@ From: nvcr.io/nvidia/pytorch:23.12-py3  # PyTorch 2.1.2, CUDA 12.2
 
     # Start Jupyter Lab
     apptainer run --nv pytorch.sif jupyter
+    
+    # Run interactive shell
+    apptainer shell --nv pytorch.sif
+    
+    # Test Container (run %test section)
+    apptainer run --nv pytorch.sif
+
