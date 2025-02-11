@@ -26,39 +26,52 @@ From: nvcr.io/nvidia/pytorch:23.12-py3  # PyTorch 2.1.2, CUDA 12.2
     # Install Python dependencies
     pip install --no-cache-dir \
         jupyterlab
+        
 
 %environment
-    # Set environment variables
-    export PATH="/opt/venv/bin:$PATH"
-    export JUPYTER_CONFIG_DIR="/opt/jupyter"
-    export LC_ALL=C.UTF-8
-    export LANG=C.UTF-8
+    export PATH=/usr/local/bin:$PATH
+    export PYTHONPATH=/workspace:$PYTHONPATH
+    export SHELL=/bin/bash
 
 %runscript
-    # Auto-bind $PWD if it is outside $HOME
-    if [[ "$PWD" != "$HOME"* ]]; then
-        echo "Binding current directory: $PWD"
-        exec apptainer exec --nv --bind "$PWD:$PWD" "$SINGULARITY_CONTAINER" jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --notebook-dir="$PWD"
+    if [ "$1" = "jupyter" ]; then
+        # Auto-bind $PWD if it is outside $HOME
+        if [[ "$PWD" != "$HOME"* ]]; then
+            echo "Binding current directory: $PWD"
+            apptainer exec --nv --bind "$PWD:$PWD" jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --notebook-dir="$PWD"
+        else
+            echo "Running Jupyter in $HOME"
+            exec jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --notebook-dir="$HOME"
+        fi
     else
-        echo "Running Jupyter in $HOME"
-        exec jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --notebook-dir="$HOME"
+        echo "Running Python script: $@"
+        python "$@"
     fi
 
 %test
     # Check installed packages and GPU access
     python3 -c "import torch; print('PyTorch Version:', torch.__version__); print('CUDA Available:', torch.cuda.is_available())"
+    python3 -c "import jupyterlab; print('JupyterLab Version:', jupyterlab.__version__)"
 
 %labels
     Author Adeel Akram
     Email adeel.chep@gmail.com
     Description "Apptainer container with NVIDIA PyTorch NGC and Jupyter Lab"
     BuildDate 2025-02-11
-    BaseImage nvcr.io/nvidia/pytorch:24.01-py3
+    BaseImage nvcr.io/nvidia/pytorch:23.12-py3
 
 %help
-    NGC PyTorch container with JupyterLab support
-    
+    This container is built on the NVIDIA NGC PyTorch base image and provides the following features:
+    - Automatically binds the current directory to /workspace if outside the home directory.
+    - Default behavior: Runs a Python script passed as an argument.
+    - Option to start Jupyter Lab by passing "lab" as the first argument.
+
     Usage:
-    $ apptainer run --nv pytorch.sif script.py     # Run Python script
-    $ apptainer run --nv pytorch.sif lab           # Start JupyterLab
-    $ apptainer shell --nv pytorch.sif             # Interactive shell
+    # Build the container
+    apptainer build pytorch.sif pytorch.def
+
+    # Run a Python script
+    apptainer run --nv pytorch.sif script.py
+
+    # Start Jupyter Lab
+    apptainer run --nv pytorch.sif jupyter

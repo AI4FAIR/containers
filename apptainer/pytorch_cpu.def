@@ -28,10 +28,6 @@ From: pytorch/pytorch:2.1.0  # PyTorch 2.1.0 CPU-only
         exec jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --notebook-dir="$HOME"
     fi
 
-%labels
-    Maintainer YourName
-    Description "CPU-only Apptainer container with PyTorch, PyTorch Lightning, and Jupyter Lab"
-
 %test
     # Check installed packages and CPU usage
     python3 -c "import torch, pytorch_lightning; print('PyTorch:', torch.__version__, 'CUDA Available:', torch.cuda.is_available(), 'PyTorch Lightning:', pytorch_lightning.__version__)"
