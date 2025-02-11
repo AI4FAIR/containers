@@ -1,0 +1,53 @@
+# HEADER
+Bootstrap: localimage
+From: fr18.6.7.sif
+
+# SECTIONS
+%setup
+
+    mkdir ${SINGULARITY_ROOTFS}/pandaroot
+    cp -R ./v13.0.0 ${SINGULARITY_ROOTFS}/pandaroot
+
+%post
+
+    # *** Setting Up FairSoft & FairRoot
+    export SIMPATH=/fairsoft/install
+    export FAIRROOTPATH=/fairroot/install
+
+    # *** Setting Up PandaRoot
+    mkdir /pandaroot/build /pandaroot/install
+    cd /pandaroot
+    mv v13.0.0 src
+    
+    # *** Configure CMake
+    cmake -S ./src -B ./build -DCMAKE_INSTALL_PREFIX=./install
+    
+    # *** Build PandaRoot
+    cmake --build ./build -j8
+
+    # *** Install PandaRoot
+    cmake --install ./build
+            
+    # *** Test Installation
+    du -hs /pandaroot/install
+    
+    # *** Cleanup PandaRoot
+    rm -rf ./build # ./src 
+    
+    # *** Cleanup OS
+    apt -y clean && \
+    rm -rf /var/lib/apt/lists/*
+
+%environment
+
+    # Export PandaRoot
+    source /pandaroot/install/bin/config.sh -p
+
+%runscript
+
+    exec /bin/bash --noprofile "$@"
+
+%labels
+
+    Author: "Adeel Akram <adeel.akram@physics.uu.se>"
+    Dated: 15-08-2022

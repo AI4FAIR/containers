@@ -1,10 +1,12 @@
-name: exatrkx
+name: exatrkx-hsf
 
 channels:
+    - defaults
     - pytorch
     - pyg
-    - defaults
     - conda-forge
+    - rapidsai
+    - nvidia
 
 dependencies:
     - pip
@@ -12,8 +14,12 @@ dependencies:
     - pandas
     - scipy
     - matplotlib
-    - cpuonly
     - pytorch==1.10.2
     - pytorch-lightning
     - pyg
-    - faiss-cpu
+    - faiss-gpu
+    - cudatoolkit=11.3
+    - cupy
+    - cudf=21.12
+    - cugraph=21.12
+        
