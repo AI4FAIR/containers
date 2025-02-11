@@ -1,0 +1,51 @@
+Bootstrap: docker
+From: pytorch/pytorch:2.1.0  # PyTorch 2.1.0 CPU-only
+
+%post
+    # Install additional dependencies
+    apt-get update && apt-get install -y \
+        python3-pip \
+        git \
+        && rm -rf /var/lib/apt/lists/*
+
+    # Install PyTorch Lightning and Jupyter Lab
+    pip install --no-cache-dir \
+        pytorch-lightning \
+        jupyterlab
+
+%environment
+    export PATH="/opt/venv/bin:$PATH"
+    export JUPYTER_CONFIG_DIR="/opt/jupyter"
+    export LC_ALL=C.UTF-8
+    export LANG=C.UTF-8
+
+%runscript
+    if [[ "$PWD" != "$HOME"* ]]; then
+        echo "Binding current directory: $PWD"
+        exec apptainer exec --bind "$PWD:$PWD" "$SINGULARITY_CONTAINER" jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --notebook-dir="$PWD"
+    else
+        echo "Running Jupyter in $HOME"
+        exec jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --notebook-dir="$HOME"
+    fi
+
+%labels
+    Maintainer YourName
+    Description "CPU-only Apptainer container with PyTorch, PyTorch Lightning, and Jupyter Lab"
+
+%test
+    # Check installed packages and CPU usage
+    python3 -c "import torch, pytorch_lightning; print('PyTorch:', torch.__version__, 'CUDA Available:', torch.cuda.is_available(), 'PyTorch Lightning:', pytorch_lightning.__version__)"
+
+%labels
+    Author Adeel Akram
+    Email adeel.chep@gmail.com
+    Description "CPU-only Apptainer container with PyTorch, PyTorch Lightning, and Jupyter Lab"
+    BuildDate 2025-02-11
+    BaseImage pytorch/pytorch:2.1.0
+
+%help
+    
+    Usage:
+    $ apptainer run --nv pytorch.sif script.py     # Run Python script
+    $ apptainer run --nv pytorch.sif lab           # Start JupyterLab
+    $ apptainer shell --nv pytorch.sif             # Interactive shell

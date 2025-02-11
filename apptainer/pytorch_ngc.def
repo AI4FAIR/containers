@@ -1,0 +1,64 @@
+# ****************************************************************************
+# PyTorch GPU Container Definition (NGC) - Version 2.1.2 (with CUDA 12.2)
+# This container is based on the NVIDIA NGC PyTorch container for PyTorch 2.1.2
+# with CUDA 12.2. It includes PyTorch, PyTorch Lightning, and JupyterLab.
+# 
+# Usage:
+#   - Run Python scripts: apptainer run pytorch_gpu_ngc.sif my_script.py
+#   - Run Jupyter Lab: apptainer run pytorch_gpu_ngc.sif jupyterlab
+#   - Run interactively: apptainer run pytorch_gpu_ngc.sif
+# 
+# Requirements:
+#   - CUDA-capable GPU (if running with GPU support)
+#   - PyTorch, PyTorch Lightning, JupyterLab installed within the container
+# ****************************************************************************
+
+Bootstrap: docker
+From: nvcr.io/nvidia/pytorch:23.12-py3  # PyTorch 2.1.2, CUDA 12.2
+
+%post
+    # Install required packages
+    apt-get update && apt-get install -y \
+        python3-pip \
+        git \
+        && rm -rf /var/lib/apt/lists/*
+
+    # Install Python dependencies
+    pip install --no-cache-dir \
+        jupyterlab
+
+%environment
+    # Set environment variables
+    export PATH="/opt/venv/bin:$PATH"
+    export JUPYTER_CONFIG_DIR="/opt/jupyter"
+    export LC_ALL=C.UTF-8
+    export LANG=C.UTF-8
+
+%runscript
+    # Auto-bind $PWD if it is outside $HOME
+    if [[ "$PWD" != "$HOME"* ]]; then
+        echo "Binding current directory: $PWD"
+        exec apptainer exec --nv --bind "$PWD:$PWD" "$SINGULARITY_CONTAINER" jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --notebook-dir="$PWD"
+    else
+        echo "Running Jupyter in $HOME"
+        exec jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --notebook-dir="$HOME"
+    fi
+
+%test
+    # Check installed packages and GPU access
+    python3 -c "import torch; print('PyTorch Version:', torch.__version__); print('CUDA Available:', torch.cuda.is_available())"
+
+%labels
+    Author Adeel Akram
+    Email adeel.chep@gmail.com
+    Description "Apptainer container with NVIDIA PyTorch NGC and Jupyter Lab"
+    BuildDate 2025-02-11
+    BaseImage nvcr.io/nvidia/pytorch:24.01-py3
+
+%help
+    NGC PyTorch container with JupyterLab support
+    
+    Usage:
+    $ apptainer run --nv pytorch.sif script.py     # Run Python script
+    $ apptainer run --nv pytorch.sif lab           # Start JupyterLab
+    $ apptainer shell --nv pytorch.sif             # Interactive shell
