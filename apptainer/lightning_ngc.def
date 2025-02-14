@@ -36,6 +36,7 @@ From: nvcr.io/nvidia/pytorch:23.12-py3  # PyTorch 2.1.2, CUDA 12.2
 
     # Handle Python packages
     pip install --no-cache-dir \
+        pytorch-lightning==2.1.* \
         scikit-learn==1.3.* \
         pandas==2.1.* \
         numpy==1.24.* \
@@ -142,3 +143,4 @@ From: nvcr.io/nvidia/pytorch:23.12-py3  # PyTorch 2.1.2, CUDA 12.2
     
     # Test Container
     apptainer test pytorch.sif
+
