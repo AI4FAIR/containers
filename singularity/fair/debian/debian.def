@@ -1,0 +1,39 @@
+# HEADER
+Bootstrap: docker
+From: debian:10.12
+
+# SECTIONS
+%post
+    
+    # *** OS Upgrade & Install
+    apt update && apt upgrade -y
+    apt install -y --no-install-recommends \
+		build-essential \
+		ca-certificates \
+		git \
+		wget
+    
+    # *** Creation Date
+    NOW=`date`
+    echo "export NOW=\"${NOW}\"" >> $SINGULARITY_ENVIRONMENT
+    
+    # *** Cleanup OS
+    apt -y clean && \
+    rm -rf /var/lib/apt/lists/*
+
+%runscript
+    echo "Creation Date: $NOW"
+    echo "Base Image: Debian 10.12"
+    
+%labels
+    Author: "Adeel Akram <adeel.akram@physics.uu.se>"
+    Dated: 15-08-2022
+    
+%help
+    SingularityCE for Developers
+    
+    Build .SIF Container from Definition
+    $ sudo singularity build debian.sif debian.def
+    
+    Build Sandbox Container from Definition
+    $ sudo singularity build --sandbox debian.sif debian.def

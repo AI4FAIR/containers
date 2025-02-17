@@ -1,0 +1,43 @@
+# HEADER
+Bootstrap: docker
+From: debian:10.12
+
+# SECTIONS
+%post
+
+    # *** OS Upgrade & Install
+    apt update && apt upgrade -y
+    apt install -y --no-install-recommends \
+		build-essential \
+		ca-certificates \
+		git \
+		wget
+    
+    # *** Setting Up FairSoft
+    mkdir -p /fairsoft/src /fairsoft/build /fairsoft/install
+    cd /fairsoft
+    git clone -b apr21p2 https://github.com/FairRootGroup/FairSoft src
+    
+    src/legacy/setup-debian.sh
+    src/bootstrap-cmake.sh /usr/local
+    
+    # *** Configure CMake
+    cmake -S ./src -B ./build -C ./src/FairSoftConfig.cmake -DCMAKE_INSTALL_PREFIX=./install
+    
+    # *** Build & Install FairSoft
+    cmake --build ./build -j8  # it will install as well
+        
+    # *** Test Installation
+    du -hs /fairsoft/install
+
+    # *** Cleanup FairSoft
+    rm -rf ./build ./src 
+    
+    # *** Cleanup OS
+    apt -y clean && \
+    rm -rf /var/lib/apt/lists/*
+
+%environment
+
+    # Export FairSoft
+    # export SIMPATH=/fairsoft/install

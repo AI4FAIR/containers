@@ -1,0 +1,146 @@
+# ****************************************************************************
+# PyTorch GPU Container Definition (NGC) - Version 2.1.2 (with CUDA 12.2)
+# This container is based on the NVIDIA NGC PyTorch container for PyTorch 2.1.2
+# with CUDA 12.2. It includes PyTorch, PyTorch Lightning, and JupyterLab.
+# 
+# Usage:
+#   - Run Python scripts: apptainer run pytorch_gpu_ngc.sif my_script.py
+#   - Run Jupyter Lab: apptainer run pytorch_gpu_ngc.sif jupyterlab
+#   - Run interactively: apptainer run pytorch_gpu_ngc.sif
+# 
+# Requirements:
+#   - CUDA-capable GPU (if running with GPU support)
+#   - PyTorch, PyTorch Lightning, JupyterLab installed within the container
+# ****************************************************************************
+
+Bootstrap: docker
+From: nvcr.io/nvidia/pytorch:23.12-py3  # PyTorch 2.1.2, CUDA 12.2
+
+%post
+    
+    # Set non-interactive shell
+    export DEBIAN_FRONTEND=noninteractive
+    
+    # Handle OS packages
+    apt-get update
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        git \
+        wget \
+        curl \
+        build-essential 
+
+    # Handle OS clean up 
+    apt-get autoremove -y && apt-get clean
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+    # Handle Python packages
+    pip install --no-cache-dir \
+        pytorch-lightning==2.1.* \
+        scikit-learn==1.3.* \
+        pandas==2.1.* \
+        numpy==1.24.* \
+        matplotlib==3.8.* \
+        seaborn==0.13.* \
+        jupyterlab==4.0.*
+
+%environment
+    # Environment variables
+    export PATH=/usr/local/bin:$PATH
+    export PYTHONPATH=/workspace:$PYTHONPATH
+    export SHELL=/bin/bash
+    export LC_ALL=C.UTF-8
+    export LANG=C.UTF-8
+    
+    # Threading controls
+    export MKL_NUM_THREADS=1
+    export NUMEXPR_NUM_THREADS=1
+    export OMP_NUM_THREADS=1
+    export OPENBLAS_NUM_THREADS=1
+
+%runscript
+    if [ "$1" = "jupyter" ]; then
+        # Handle Ctrl+C gracefully
+        trap 'echo "Caught SIGINT, shutting down Jupyter gracefully..."; kill -TERM $!; exit 1' INT
+        
+        shift  # Remove 'jupyter' from args
+        
+        if [[ "$PWD" != "$HOME"* ]]; then
+            echo "Starting Jupyter Lab in: $PWD"
+        else
+            echo "Starting Jupyter Lab in: $HOME"
+        fi
+
+        jupyter-lab --ip=0.0.0.0 --port=${JUPYTER_PORT:-8888} --no-browser --notebook-dir="$PWD" "$@"
+        
+    elif [ -n "$1" ]; then
+        echo "Running Python script: $@"
+        python "$@"
+    else
+        echo "Error: Please provide a Python script or 'jupyter' as an argument"
+        exit 1
+    fi
+
+
+%startscript
+    # For running container as a service
+    jupyter-lab --ip=0.0.0.0 --port=${JUPYTER_PORT:-8888} --no-browser --notebook-dir="/workspace"
+
+%test
+    echo "Testing Python packages..."
+    python3 -c "import torch; print('PyTorch Version:', torch.__version__); assert torch.cuda.is_available(), 'CUDA not available'"
+    python3 -c "import pytorch_lightning as pl; print('PyTorch Lightning Version:', pl.__version__)"
+    python3 -c "import matplotlib; print('Matplotlib Version:', matplotlib.__version__)"
+    python3 -c "import pandas; print('Pandas Version:', pandas.__version__)"
+    python3 -c "import numpy; print('NumPy Version:', numpy.__version__)"
+    python3 -c "import seaborn; print('Seaborn Version:', seaborn.__version__)"
+    python3 -c "import sklearn; print('Scikit-learn Version:', sklearn.__version__)"
+    
+    echo "Testing GPU access..."
+    python3 -c "import torch; assert torch.cuda.device_count() > 0, 'No GPU devices found'; print('Found', torch.cuda.device_count(), 'GPU(s)')"
+    
+    echo "Testing Jupyter installation..."
+    jupyter-lab --version
+    
+    echo "All tests passed!"
+
+%labels
+    Author Adeel Akram
+    Email adeel.chep@gmail.com
+    Description "Apptainer container with NVIDIA PyTorch NGC, PyTorch Lightning, JupyterLab, and data science libraries"
+    BuildDate 2025-02-11
+    BaseImage nvcr.io/nvidia/pytorch:23.12-py3
+
+%help
+    This container is built on the NVIDIA NGC PyTorch base image and provides the following features:
+    - PyTorch and PyTorch Lightning for deep learning
+    - JupyterLab for interactive development
+    - Data science libraries: matplotlib, pandas, numpy, seaborn, and scikit-learn
+    - Automatically uses current directory as workspace
+    - Threading controls for better performance
+    
+    Usage:
+    # Build the container
+    apptainer build pytorch.sif pytorch.def
+    
+    # Run a Python script
+    apptainer run --nv pytorch.sif script.py
+    
+    # Start Jupyter Lab (default port 8888)
+    apptainer run --nv pytorch.sif jupyter
+    
+    # Start Jupyter Lab with custom port
+    JUPYTER_PORT=9999 apptainer run --nv pytorch.sif jupyter
+    
+    # Start Jupyter with additional args
+    apptainer run --nv pytorch.sif jupyter --NotebookApp.token='' --NotebookApp.password=''
+    
+    # Run as a service
+    apptainer instance start --nv pytorch.sif pytorch
+    
+    # Run interactive shell
+    apptainer shell --nv pytorch.sif
+    
+    # Test Container
+    apptainer test pytorch.sif
+
